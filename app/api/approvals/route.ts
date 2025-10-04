@@ -11,10 +11,12 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get pending approvals for this user
-    const approvals = await prisma.approval.findMany({
+    const managerId = session.user.id
+
+    // Get pending approvals from the old approval system
+    const oldSystemApprovals = await prisma.approval.findMany({
       where: {
-        approverId: session.user.id,
+        approverId: managerId,
         status: "PENDING"
       },
       include: {
@@ -60,7 +62,94 @@ export async function GET() {
       }
     })
 
-    return NextResponse.json(approvals)
+    // Get expenses with approval sequences where this manager has a pending step
+    const expensesWithSequences = await prisma.expense.findMany({
+      where: {
+        AND: [
+          {
+            approvalSequenceId: {
+              not: null
+            }
+          },
+          {
+            status: "PENDING"
+          },
+          {
+            approvalSequence: {
+              steps: {
+                some: {
+                  managerId: managerId,
+                  status: "PENDING"
+                }
+              }
+            }
+          }
+        ]
+      },
+      include: {
+        submitter: {
+          select: {
+            name: true,
+            email: true,
+            role: true
+          }
+        },
+        category: {
+          select: {
+            name: true,
+            color: true
+          }
+        },
+        approvalSequence: {
+          include: {
+            steps: {
+              include: {
+                manager: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true
+                  }
+                }
+              },
+              orderBy: {
+                order: 'asc'
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    })
+
+    // Convert approval sequence expenses to the approval format
+    const sequenceApprovals = expensesWithSequences.map((expense: any) => {
+      // Find the pending step for this manager
+      const pendingStep = expense.approvalSequence?.steps.find(
+        (step: any) => step.managerId === managerId && step.status === "PENDING"
+      )
+
+      return {
+        id: `seq_${expense.id}_${pendingStep?.id}`, // Unique ID for sequence approvals
+        status: "PENDING",
+        comments: null,
+        createdAt: expense.createdAt,
+        expense: expense,
+        isSequenceApproval: true,
+        stepId: pendingStep?.id // Store step ID for later use
+      }
+    })
+
+    // Combine both systems
+    const allApprovals = [
+      ...oldSystemApprovals.map((approval: any) => ({ ...approval, isSequenceApproval: false })),
+      ...sequenceApprovals
+    ]
+
+    return NextResponse.json(allApprovals)
   } catch (error) {
     console.error("Error fetching approvals:", error)
     return NextResponse.json(

@@ -77,9 +77,8 @@ export default function ApprovalsPage() {
 
     const fetchApprovals = async () => {
         try {
-            // Fetch expenses that need approval from the current user
-            // This includes both old approval system and new approval sequence system
-            const response = await fetch("/api/expenses/pending-approvals")
+            // Use the main approvals endpoint which now handles both systems
+            const response = await fetch("/api/approvals")
             if (response.ok) {
                 const data = await response.json()
                 setApprovals(data)
@@ -109,17 +108,47 @@ export default function ApprovalsPage() {
         setProcessing(true)
 
         try {
-            const response = await fetch("/api/approvals", {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    approvalId: selectedApproval.id,
-                    status: actionType,
-                    comments: comments.trim() || null
+            let response: Response
+
+            if (selectedApproval.isSequenceApproval) {
+                // Handle new approval sequence system
+                const expenseId = selectedApproval.expense.id
+                
+                // Find the current user's pending step in the approval sequence
+                const currentStep = selectedApproval.expense.approvalSequence?.steps.find(
+                    step => step.managerId === session?.user.id && step.status === "PENDING"
+                )
+
+                if (!currentStep) {
+                    toast.error("No pending approval step found for you")
+                    return
+                }
+
+                response = await fetch(`/api/expenses/${expenseId}/approve`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        stepId: currentStep.id,
+                        action: actionType,
+                        comments: comments.trim() || null
+                    })
                 })
-            })
+            } else {
+                // Handle old approval system
+                response = await fetch("/api/approvals", {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        approvalId: selectedApproval.id,
+                        status: actionType,
+                        comments: comments.trim() || null
+                    })
+                })
+            }
 
             if (response.ok) {
                 toast.success(`Expense ${actionType.toLowerCase()} successfully`)

@@ -224,21 +224,24 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Create approval records for managers/admins
-    const approvers = await prisma.user.findMany({
-      where: {
-        role: { in: ["ADMIN", "MANAGER"] },
-        id: { not: session.user.id } // Don't create approval for self
-      }
-    })
-
-    if (approvers.length > 0) {
-      await prisma.approval.createMany({
-        data: approvers.map((approver: any) => ({
-          expenseId: expense.id,
-          approverId: approver.id
-        }))
+    // Create approval records for managers/admins ONLY if no approval sequence is assigned
+    // If approval sequence is assigned, use the sequence-based approval system instead
+    if (!approvalSequenceId) {
+      const approvers = await prisma.user.findMany({
+        where: {
+          role: { in: ["ADMIN", "MANAGER"] },
+          id: { not: session.user.id } // Don't create approval for self
+        }
       })
+
+      if (approvers.length > 0) {
+        await prisma.approval.createMany({
+          data: approvers.map((approver: any) => ({
+            expenseId: expense.id,
+            approverId: approver.id
+          }))
+        })
+      }
     }
 
     return NextResponse.json(expense, { status: 201 })

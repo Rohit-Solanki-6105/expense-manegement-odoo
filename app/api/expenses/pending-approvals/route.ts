@@ -21,8 +21,15 @@ export async function GET() {
       where: {
         AND: [
           {
+            approvalSequenceId: {
+              not: null
+            }
+          },
+          {
+            status: "PENDING"
+          },
+          {
             approvalSequence: {
-              isNot: null,
               steps: {
                 some: {
                   managerId: managerId,
@@ -30,9 +37,6 @@ export async function GET() {
                 }
               }
             }
-          },
-          {
-            status: "PENDING"
           }
         ]
       },
@@ -125,7 +129,7 @@ export async function GET() {
     })
 
     // Convert new system expenses to the format expected by the frontend
-    const newSystemFormatted = expensesWithSequences.map(expense => ({
+    const newSystemFormatted = expensesWithSequences.map((expense: any) => ({
       id: `seq_${expense.id}`, // Prefix to distinguish from old system
       status: "PENDING",
       comments: null,
@@ -135,7 +139,7 @@ export async function GET() {
     }))
 
     // Convert old system approvals to include the flag
-    const oldSystemFormatted = oldSystemApprovals.map(approval => ({
+    const oldSystemFormatted = oldSystemApprovals.map((approval: any) => ({
       ...approval,
       isSequenceApproval: false
     }))
