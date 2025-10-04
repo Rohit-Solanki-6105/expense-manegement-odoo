@@ -67,6 +67,25 @@ export async function GET(request: NextRequest) {
               }
             }
           }
+        },
+        approvalSequence: {
+          include: {
+            steps: {
+              include: {
+                manager: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true
+                  }
+                }
+              },
+              orderBy: {
+                order: 'asc'
+              }
+            }
+          }
         }
       },
       orderBy: {
@@ -101,7 +120,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not authorized to submit expenses" }, { status: 403 })
     }
 
-    const { title, description, amount, currency, date, categoryId, receiptUrl } = await request.json()
+    const { title, description, amount, currency, date, categoryId, receiptUrl, approvalSequenceId } = await request.json()
 
     if (!title || !amount || !date || !categoryId) {
       return NextResponse.json(
@@ -132,6 +151,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Verify approval sequence if provided
+    let approvalSequence = null
+    if (approvalSequenceId) {
+      approvalSequence = await prisma.approvalSequence.findFirst({
+        where: {
+          id: approvalSequenceId,
+          isActive: true
+        },
+        include: {
+          steps: {
+            orderBy: {
+              order: 'asc'
+            }
+          }
+        }
+      })
+
+      if (!approvalSequence) {
+        return NextResponse.json(
+          { error: "Invalid or inactive approval sequence" },
+          { status: 400 }
+        )
+      }
+    }
+
     const expense = await prisma.expense.create({
       data: {
         title,
@@ -141,7 +185,8 @@ export async function POST(request: NextRequest) {
         date: new Date(date),
         categoryId,
         receiptUrl,
-        submittedBy: session.user.id
+        submittedBy: session.user.id,
+        approvalSequenceId: approvalSequenceId || null
       },
       include: {
         submitter: {
@@ -155,6 +200,25 @@ export async function POST(request: NextRequest) {
           select: {
             name: true,
             color: true
+          }
+        },
+        approvalSequence: {
+          include: {
+            steps: {
+              include: {
+                manager: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true
+                  }
+                }
+              },
+              orderBy: {
+                order: 'asc'
+              }
+            }
           }
         }
       }

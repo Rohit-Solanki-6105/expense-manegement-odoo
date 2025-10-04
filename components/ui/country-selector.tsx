@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
-interface Country {
+export interface Country {
   name: string
   code: string
   currency?: string

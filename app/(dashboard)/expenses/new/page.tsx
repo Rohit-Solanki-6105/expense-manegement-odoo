@@ -24,10 +24,28 @@ interface Category {
   isActive?: boolean
 }
 
+interface ApprovalSequence {
+  id: string
+  name: string
+  description?: string
+  minApprovalPercentage: number
+  isActive: boolean
+  steps: Array<{
+    id: string
+    manager: {
+      id: string
+      name: string | null
+      email: string
+    }
+    order: number
+  }>
+}
+
 export default function NewExpensePage() {
   const { data: session } = useSession()
   const router = useRouter()
   const [categories, setCategories] = useState<Category[]>([])
+  const [approvalSequences, setApprovalSequences] = useState<ApprovalSequence[]>([])
   const [loading, setLoading] = useState(false)
   const [date, setDate] = useState<Date>()
   const [formData, setFormData] = useState({
@@ -36,6 +54,7 @@ export default function NewExpensePage() {
     amount: "",
     currency: "USD",
     categoryId: "",
+    approvalSequenceId: "default",
     receiptUrl: ""
   })
 
@@ -49,6 +68,7 @@ export default function NewExpensePage() {
 
   useEffect(() => {
     fetchCategories()
+    fetchApprovalSequences()
   }, [])
 
   useEffect(() => {
@@ -71,6 +91,18 @@ export default function NewExpensePage() {
       }
     } catch (error) {
       toast.error("Failed to fetch categories")
+    }
+  }
+
+  const fetchApprovalSequences = async () => {
+    try {
+      const response = await fetch("/api/approval-sequences")
+      if (response.ok) {
+        const data = await response.json()
+        setApprovalSequences(data.filter((seq: ApprovalSequence) => seq.isActive))
+      }
+    } catch (error) {
+      console.error("Failed to fetch approval sequences:", error)
     }
   }
 
@@ -126,7 +158,8 @@ export default function NewExpensePage() {
         originalAmount: finalAmount,
         originalCurrency: formData.currency,
         convertedAmount: convertedAmount,
-        baseCurrency: baseCurrency
+        baseCurrency: baseCurrency,
+        approvalSequenceId: formData.approvalSequenceId === "default" ? null : formData.approvalSequenceId
       }
 
       const response = await fetch("/api/expenses", {
@@ -329,6 +362,37 @@ export default function NewExpensePage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Approval Sequence */}
+              <div className="space-y-2">
+                <Label htmlFor="approval-sequence">Approval Workflow (Optional)</Label>
+                <Select
+                  value={formData.approvalSequenceId}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, approvalSequenceId: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Use default approval or select a workflow" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Use default approval process</SelectItem>
+                    {approvalSequences.map((sequence) => (
+                      <SelectItem key={sequence.id} value={sequence.id}>
+                        <div className="space-y-1">
+                          <div className="font-medium">{sequence.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {sequence.steps.length} managers • Min {sequence.minApprovalPercentage}% approval
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formData.approvalSequenceId && formData.approvalSequenceId !== "default" && (
+                  <div className="text-xs text-muted-foreground">
+                    Selected workflow: {approvalSequences.find(s => s.id === formData.approvalSequenceId)?.description}
+                  </div>
+                )}
               </div>
 
               {/* Receipt Upload */}

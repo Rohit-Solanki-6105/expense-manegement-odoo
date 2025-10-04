@@ -17,8 +17,10 @@ import {
   Users, 
   Tags,
   LogOut,
-  User
+  User,
+  GitBranch
 } from "lucide-react"
+import { useState } from "react"
 
 interface SidebarProps {
   children: React.ReactNode
@@ -27,6 +29,7 @@ interface SidebarProps {
 export function Sidebar({ children }: SidebarProps) {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const [ loading, isLoading] = useState<boolean>(true);
 
   const navigation = [
     {
@@ -39,7 +42,7 @@ export function Sidebar({ children }: SidebarProps) {
       name: "My Expenses",
       href: "/expenses",
       icon: Receipt,
-      roles: ["MANAGER", "EMPLOYEE"]
+      roles: ["MANAGER", "EMPLOYEE", "ADMIN"]
     },
     {
       name: "Submit Expense",
@@ -63,6 +66,12 @@ export function Sidebar({ children }: SidebarProps) {
       name: "Categories",
       href: "/categories",
       icon: Tags,
+      roles: ["ADMIN"]
+    },
+    {
+      name: "Approval Sequences",
+      href: "/approval-sequences",
+      icon: GitBranch,
       roles: ["ADMIN"]
     },
     {
@@ -105,6 +114,7 @@ export function Sidebar({ children }: SidebarProps) {
                   <Link
                     key={item.name}
                     href={item.href}
+                    onClick={() => isLoading(true)}
                     className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
                       isActive
                         ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600"

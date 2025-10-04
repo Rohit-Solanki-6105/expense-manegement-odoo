@@ -63,9 +63,10 @@ model User {
   sessions Session[]
   
   // Expense Management
-  expenses      Expense[]
-  approvals     Approval[]
-  categories    Category[]
+  expenses         Expense[]
+  approvals        Approval[]
+  categories       Category[]
+  approvalSteps    ApprovalStep[]    // Manager steps in approval sequences
 }
 
 model Category {
@@ -83,23 +84,25 @@ model Category {
 }
 
 model Expense {
-  id              String        @id @default(cuid())
-  title           String
-  description     String?
-  amount          Float
-  currency        String        @default("USD")
-  date            DateTime
-  receiptUrl      String?
-  status          ExpenseStatus @default(PENDING)
-  rejectionReason String?
-  submittedBy     String
-  categoryId      String
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                   String        @id @default(cuid())
+  title                String
+  description          String?
+  amount               Float
+  currency             String        @default("USD")
+  date                 DateTime
+  receiptUrl           String?
+  status               ExpenseStatus @default(PENDING)
+  rejectionReason      String?
+  submittedBy          String
+  categoryId           String
+  approvalSequenceId   String?       // Optional: which approval sequence to use
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
-  submitter   User        @relation(fields: [submittedBy], references: [id])
-  category    Category    @relation(fields: [categoryId], references: [id])
-  approvals   Approval[]
+  submitter         User               @relation(fields: [submittedBy], references: [id])
+  category          Category           @relation(fields: [categoryId], references: [id])
+  approvals         Approval[]
+  approvalSequence  ApprovalSequence?  @relation(fields: [approvalSequenceId], references: [id])
 }
 
 model Approval {
@@ -128,6 +131,38 @@ enum ApprovalStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+// Approval Sequence Models
+model ApprovalSequence {
+  id                    String          @id @default(cuid())
+  name                  String
+  description           String?
+  minApprovalPercentage Int             @default(50) // Minimum percentage of managers that must approve
+  isActive              Boolean         @default(true)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  steps                 ApprovalStep[]  // Ordered list of approval steps
+  expenses              Expense[]       // Expenses using this sequence
+}
+
+model ApprovalStep {
+  id         String         @id @default(cuid())
+  sequenceId String
+  managerId  String
+  order      Int            // Order in the approval sequence (1, 2, 3, etc.)
+  status     ApprovalStatus @default(PENDING)
+  approvedAt DateTime?      // When this step was approved/rejected
+  comments   String?        // Optional comments from the manager
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  sequence   ApprovalSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  manager    User             @relation(fields: [managerId], references: [id])
+
+  @@unique([sequenceId, managerId]) // Each manager can only be in a sequence once
+  @@unique([sequenceId, order])     // Each order position must be unique in a sequence
 }
 
 model VerificationToken {
