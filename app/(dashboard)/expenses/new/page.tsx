@@ -15,7 +15,7 @@ import { CalendarIcon, Upload, DollarSign, ArrowRightLeft } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { useCurrencyConverter, formatCurrency, COMMON_CURRENCIES } from "@/lib/currency"
+import { useCurrencyConverter, formatCurrency, formatCurrencyWithSymbol, getCurrencySymbol, COMMON_CURRENCIES } from "@/lib/currency"
 
 interface Category {
   id: string
@@ -272,7 +272,7 @@ export default function NewExpensePage() {
                     <SelectContent>
                       {COMMON_CURRENCIES.map((currency) => (
                         <SelectItem key={currency.code} value={currency.code}>
-                          {currency.code} - {currency.name}
+                          {currency.symbol} {currency.code} - {currency.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -290,12 +290,12 @@ export default function NewExpensePage() {
                   <div className="mt-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span>
-                        {formatCurrency(parseFloat(formData.amount) || 0, formData.currency)} 
+                        {formatCurrencyWithSymbol(parseFloat(formData.amount) || 0, formData.currency)} 
                         <span className="text-muted-foreground ml-1">({formData.currency})</span>
                       </span>
                       <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
                       <span className="font-medium">
-                        {formatCurrency(convertedAmount, baseCurrency)}
+                        {formatCurrencyWithSymbol(convertedAmount, baseCurrency)}
                         <span className="text-muted-foreground ml-1">({baseCurrency})</span>
                       </span>
                     </div>

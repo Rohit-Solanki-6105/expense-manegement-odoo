@@ -183,7 +183,7 @@ export const convertAmountSync = (
   return usdAmount * targetRate
 }
 
-// Common currencies for dropdowns
+// Common currencies for dropdowns with symbols
 export const COMMON_CURRENCIES = [
   { code: "USD", name: "US Dollar", symbol: "$" },
   { code: "EUR", name: "Euro", symbol: "€" },
@@ -194,5 +194,51 @@ export const COMMON_CURRENCIES = [
   { code: "CHF", name: "Swiss Franc", symbol: "Fr" },
   { code: "CNY", name: "Chinese Yuan", symbol: "¥" },
   { code: "INR", name: "Indian Rupee", symbol: "₹" },
-  { code: "SGD", name: "Singapore Dollar", symbol: "S$" }
+  { code: "SGD", name: "Singapore Dollar", symbol: "S$" },
+  { code: "HKD", name: "Hong Kong Dollar", symbol: "HK$" },
+  { code: "NZD", name: "New Zealand Dollar", symbol: "NZ$" },
+  { code: "KRW", name: "South Korean Won", symbol: "₩" },
+  { code: "BRL", name: "Brazilian Real", symbol: "R$" },
+  { code: "MXN", name: "Mexican Peso", symbol: "$" },
+  { code: "RUB", name: "Russian Ruble", symbol: "₽" },
+  { code: "ZAR", name: "South African Rand", symbol: "R" },
+  { code: "TRY", name: "Turkish Lira", symbol: "₺" },
+  { code: "THB", name: "Thai Baht", symbol: "฿" },
+  { code: "MYR", name: "Malaysian Ringgit", symbol: "RM" },
+  { code: "IDR", name: "Indonesian Rupiah", symbol: "Rp" },
+  { code: "PHP", name: "Philippine Peso", symbol: "₱" },
+  { code: "VND", name: "Vietnamese Dong", symbol: "₫" },
+  { code: "PKR", name: "Pakistani Rupee", symbol: "₨" },
+  { code: "NGN", name: "Nigerian Naira", symbol: "₦" },
+  { code: "EGP", name: "Egyptian Pound", symbol: "£" },
+  { code: "ILS", name: "Israeli Shekel", symbol: "₪" },
+  { code: "PLN", name: "Polish Zloty", symbol: "zł" },
+  { code: "CZK", name: "Czech Koruna", symbol: "Kč" },
+  { code: "HUF", name: "Hungarian Forint", symbol: "Ft" },
+  { code: "NOK", name: "Norwegian Krone", symbol: "kr" },
+  { code: "SEK", name: "Swedish Krona", symbol: "kr" },
+  { code: "DKK", name: "Danish Krone", symbol: "kr" },
 ]
+
+// Get currency symbol for a given currency code
+export const getCurrencySymbol = (currencyCode: string): string => {
+  const currency = COMMON_CURRENCIES.find(c => c.code === currencyCode.toUpperCase())
+  return currency?.symbol || currencyCode
+}
+
+// Format currency with symbol
+export const formatCurrencyWithSymbol = (amount: number, currencyCode: string): string => {
+  const symbol = getCurrencySymbol(currencyCode)
+  const formattedAmount = amount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+  
+  // For some currencies, symbol goes after the amount
+  const symbolAfterCurrencies = ['SEK', 'NOK', 'DKK', 'CZK', 'PLN', 'HUF']
+  if (symbolAfterCurrencies.includes(currencyCode.toUpperCase())) {
+    return `${formattedAmount} ${symbol}`
+  }
+  
+  return `${symbol}${formattedAmount}`
+}

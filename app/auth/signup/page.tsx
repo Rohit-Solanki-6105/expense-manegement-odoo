@@ -10,7 +10,8 @@ import { CountrySelector } from '@/components/ui/country-selector'
 interface Country {
   name: string
   code: string
-  currency?: string
+  currency: string
+  symbol: string
 }
 
 export default function SignUp() {
@@ -58,7 +59,8 @@ export default function SignUp() {
           password,
           country: selectedCountry.name,
           countryCode: selectedCountry.code,
-          currency: selectedCountry.currency || 'USD',
+          currency: selectedCountry.currency,
+          currencySymbol: selectedCountry.symbol,
         }),
       })
 
