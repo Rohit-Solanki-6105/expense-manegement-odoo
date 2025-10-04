@@ -16,6 +16,7 @@ import { format } from "date-fns"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useCurrencyConverter, formatCurrency, formatCurrencyWithSymbol, getCurrencySymbol, COMMON_CURRENCIES } from "@/lib/currency"
+import { useCurrency } from "@/contexts/currency-context"
 
 interface Category {
   id: string
@@ -44,6 +45,7 @@ interface ApprovalSequence {
 export default function NewExpensePage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const { currency: userCurrency, symbol: userSymbol, formatAmount } = useCurrency()
   const [categories, setCategories] = useState<Category[]>([])
   const [approvalSequences, setApprovalSequences] = useState<ApprovalSequence[]>([])
   const [loading, setLoading] = useState(false)
@@ -52,7 +54,7 @@ export default function NewExpensePage() {
     title: "",
     description: "",
     amount: "",
-    currency: "USD",
+    currency: userCurrency,
     categoryId: "",
     approvalSequenceId: "default",
     receiptUrl: ""
@@ -244,9 +246,11 @@ export default function NewExpensePage() {
               {/* Amount and Currency */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="amount">Amount</Label>
+                  <Label htmlFor="amount">Amount ({userCurrency})</Label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <span className="absolute left-3 top-3 text-sm font-medium text-muted-foreground">
+                      {userSymbol}
+                    </span>
                     <Input
                       id="amount"
                       type="number"

@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { formatCurrency, useCurrencyConverter, COMMON_CURRENCIES } from "@/lib/currency"
+import { useCurrency } from "@/contexts/currency-context"
 import { toast } from "sonner"
 
 interface DashboardStats {
@@ -51,9 +52,10 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const { data: session } = useSession()
+  const { currency: userCurrency, formatAmount } = useCurrency()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [viewCurrency, setViewCurrency] = useState("USD")
+  const [viewCurrency, setViewCurrency] = useState(userCurrency)
   const { convertAmount } = useCurrencyConverter()
 
   const userRole = session?.user?.role as string
@@ -131,12 +133,20 @@ export default function DashboardPage() {
     return (
       <div className="text-right">
         <div className="font-medium">
-          {formatCurrency(amount, fromCurrency)}
+          {fromCurrency === userCurrency ? 
+            formatAmount(amount) : 
+            formatCurrency(amount, fromCurrency)
+          }
         </div>
         {convertedAmount && fromCurrency !== viewCurrency && (
           <div className="text-xs text-muted-foreground flex items-center justify-end gap-1">
             <ArrowRightLeft className="h-3 w-3" />
-            {converting ? "..." : formatCurrency(convertedAmount, viewCurrency)}
+            {converting ? "..." : 
+              (viewCurrency === userCurrency ? 
+                formatAmount(convertedAmount) : 
+                formatCurrency(convertedAmount, viewCurrency)
+              )
+            }
           </div>
         )}
       </div>
@@ -245,10 +255,10 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {formatCurrency(stats?.monthlyTotal || 0, viewCurrency)}
+                  {formatAmount(stats?.monthlyTotal || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Approved expenses
+                  Approved expenses in {userCurrency}
                 </p>
               </CardContent>
             </Card>

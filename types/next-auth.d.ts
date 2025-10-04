@@ -8,6 +8,8 @@ declare module 'next-auth' {
       email?: string | null
       role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
       canBeEmployee: boolean
+      currency?: string | null
+      country?: string | null
     }
   }
 
@@ -17,6 +19,8 @@ declare module 'next-auth' {
     email?: string | null
     role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
     canBeEmployee: boolean
+    currency?: string | null
+    country?: string | null
   }
 }
 
@@ -25,5 +29,7 @@ declare module 'next-auth/jwt' {
     id: string
     role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
     canBeEmployee: boolean
+    currency?: string | null
+    country?: string | null
   }
 }

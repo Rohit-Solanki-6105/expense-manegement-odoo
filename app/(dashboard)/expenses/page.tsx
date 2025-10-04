@@ -13,6 +13,7 @@ import { Plus, Search, Filter, Eye, Receipt, ArrowRightLeft, DollarSign } from "
 import { format } from "date-fns"
 import { toast } from "sonner"
 import { formatCurrency, useCurrencyConverter, COMMON_CURRENCIES } from "@/lib/currency"
+import { useCurrency } from "@/contexts/currency-context"
 import { ApprovalStatusDialog } from "@/components/approval-status-dialog"
 
 interface Expense {
@@ -53,13 +54,14 @@ interface Category {
 
 export default function ExpensesPage() {
     const { data: session } = useSession()
+    const { currency: userCurrency, formatAmount } = useCurrency()
     const [expenses, setExpenses] = useState<Expense[]>([])
     const [categories, setCategories] = useState<Category[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState("")
     const [statusFilter, setStatusFilter] = useState("all")
     const [categoryFilter, setCategoryFilter] = useState("all")
-    const [viewCurrency, setViewCurrency] = useState("USD")
+    const [viewCurrency, setViewCurrency] = useState(userCurrency)
 
     const { convertAmount } = useCurrencyConverter()
 
@@ -127,12 +129,20 @@ export default function ExpensesPage() {
         return (
             <div className="text-right">
                 <div className="font-medium">
-                    {formatCurrency(expense.amount, expense.currency)}
+                    {expense.currency === userCurrency ? 
+                        formatAmount(expense.amount) : 
+                        formatCurrency(expense.amount, expense.currency)
+                    }
                 </div>
                 {convertedAmount && expense.currency !== viewCurrency && (
                     <div className="text-xs text-muted-foreground flex items-center justify-end gap-1">
                         <ArrowRightLeft className="h-3 w-3" />
-                        {loading ? "Converting..." : formatCurrency(convertedAmount, viewCurrency)}
+                        {loading ? "Converting..." : 
+                            (viewCurrency === userCurrency ? 
+                                formatAmount(convertedAmount) : 
+                                formatCurrency(convertedAmount, viewCurrency)
+                            )
+                        }
                     </div>
                 )}
                 {expense.originalCurrency && expense.originalCurrency !== expense.currency && (

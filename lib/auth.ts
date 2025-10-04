@@ -43,6 +43,8 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           role: user.role,
           canBeEmployee: user.canBeEmployee,
+          currency: user.currency,
+          country: user.country,
         }
       }
     })
@@ -56,6 +58,8 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.role = user.role
         token.canBeEmployee = user.canBeEmployee
+        token.currency = user.currency
+        token.country = user.country
       }
       return token
     },
@@ -64,6 +68,8 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string
         session.user.role = token.role as 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
         session.user.canBeEmployee = token.canBeEmployee as boolean
+        session.user.currency = token.currency as string
+        session.user.country = token.country as string
       }
       return session
     }
