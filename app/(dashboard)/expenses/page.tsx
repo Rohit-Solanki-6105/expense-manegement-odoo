@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Filter, Eye, Receipt } from "lucide-react"
+import { Plus, Search, Filter, Eye, Receipt, ArrowRightLeft, DollarSign } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
+import { formatCurrency, useCurrencyConverter, COMMON_CURRENCIES } from "@/lib/currency"
 
 interface Expense {
   id: string
@@ -19,6 +20,10 @@ interface Expense {
   description: string | null
   amount: number
   currency: string
+  originalAmount?: number
+  originalCurrency?: string
+  convertedAmount?: number
+  baseCurrency?: string
   date: string
   status: string
   createdAt: string
@@ -53,6 +58,9 @@ export default function ExpensesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [viewCurrency, setViewCurrency] = useState("USD")
+  
+  const { convertAmount } = useCurrencyConverter()
 
   useEffect(() => {
     fetchExpenses()
@@ -99,6 +107,42 @@ export default function ExpensesPage() {
     }
   }
 
+  const ExpenseAmount = ({ expense }: { expense: Expense }) => {
+    const [convertedAmount, setConvertedAmount] = useState<number | null>(null)
+    const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+      if (expense.currency !== viewCurrency) {
+        setLoading(true)
+        convertAmount(expense.amount, expense.currency, viewCurrency)
+          .then(setConvertedAmount)
+          .catch(() => setConvertedAmount(null))
+          .finally(() => setLoading(false))
+      } else {
+        setConvertedAmount(null)
+      }
+    }, [expense.amount, expense.currency, viewCurrency])
+
+    return (
+      <div className="text-right">
+        <div className="font-medium">
+          {formatCurrency(expense.amount, expense.currency)}
+        </div>
+        {convertedAmount && expense.currency !== viewCurrency && (
+          <div className="text-xs text-muted-foreground flex items-center justify-end gap-1">
+            <ArrowRightLeft className="h-3 w-3" />
+            {loading ? "Converting..." : formatCurrency(convertedAmount, viewCurrency)}
+          </div>
+        )}
+        {expense.originalCurrency && expense.originalCurrency !== expense.currency && (
+          <div className="text-xs text-blue-600">
+            Original: {formatCurrency(expense.originalAmount || expense.amount, expense.originalCurrency)}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const filteredExpenses = expenses.filter(expense =>
     expense.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -108,6 +152,14 @@ export default function ExpensesPage() {
   const canSubmitExpenses = session?.user?.role === "EMPLOYEE" || 
                            session?.user?.role === "MANAGER" ||
                            ((session?.user as any)?.role === "MANAGER" && (session?.user as any)?.canBeEmployee)
+
+  // Calculate total amounts by currency
+  const totalsByCurrency = filteredExpenses.reduce((totals, expense) => {
+    const currency = expense.currency
+    if (!totals[currency]) totals[currency] = 0
+    totals[currency] += expense.amount
+    return totals
+  }, {} as Record<string, number>)
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -128,12 +180,79 @@ export default function ExpensesPage() {
         )}
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+            <Receipt className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{filteredExpenses.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Active submissions
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <Badge className="bg-yellow-100 text-yellow-800">●</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {filteredExpenses.filter(e => e.status === "PENDING").length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Awaiting approval
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Approved</CardTitle>
+            <Badge className="bg-green-100 text-green-800">●</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {filteredExpenses.filter(e => e.status === "APPROVED").length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ready for payment
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              {Object.entries(totalsByCurrency).slice(0, 2).map(([currency, total]) => (
+                <div key={currency} className="text-lg font-bold">
+                  {formatCurrency(total, currency)}
+                </div>
+              ))}
+              {Object.keys(totalsByCurrency).length > 2 && (
+                <div className="text-xs text-muted-foreground">
+                  +{Object.keys(totalsByCurrency).length - 2} more currencies
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            Filters
+            Filters & View Options
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -150,11 +269,11 @@ export default function ExpensesPage() {
               </div>
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Filter by status" />
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="PENDING">Pending</SelectItem>
                 <SelectItem value="APPROVED">Approved</SelectItem>
                 <SelectItem value="REJECTED">Rejected</SelectItem>
@@ -162,8 +281,8 @@ export default function ExpensesPage() {
               </SelectContent>
             </Select>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Filter by category" />
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
@@ -174,10 +293,21 @@ export default function ExpensesPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={viewCurrency} onValueChange={setViewCurrency}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="View Currency" />
+              </SelectTrigger>
+              <SelectContent>
+                {COMMON_CURRENCIES.map((currency) => (
+                  <SelectItem key={currency.code} value={currency.code}>
+                    {currency.code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
-
       {/* Expenses Table */}
       <Card>
         <CardHeader>
@@ -209,7 +339,7 @@ export default function ExpensesPage() {
                   <TableRow>
                     <TableHead>Title</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>Amount</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Submitter</TableHead>
@@ -239,9 +369,7 @@ export default function ExpensesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">
-                          {expense.currency} {expense.amount.toFixed(2)}
-                        </div>
+                        <ExpenseAmount expense={expense} />
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">

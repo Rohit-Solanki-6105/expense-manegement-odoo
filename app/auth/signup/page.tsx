@@ -10,8 +10,7 @@ import { CountrySelector } from '@/components/ui/country-selector'
 interface Country {
   name: string
   code: string
-  currency: string | null
-  currencySymbol: string | null
+  currency?: string
 }
 
 export default function SignUp() {
@@ -59,7 +58,7 @@ export default function SignUp() {
           password,
           country: selectedCountry.name,
           countryCode: selectedCountry.code,
-          currency: selectedCountry.currency,
+          currency: selectedCountry.currency || 'USD',
         }),
       })
 
@@ -132,11 +131,13 @@ export default function SignUp() {
               <label htmlFor="country" className="block text-sm font-medium text-gray-700">
                 Country
               </label>
-              <CountrySelector
-                value={selectedCountry?.code || ''}
-                onChange={setSelectedCountry}
-                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              />
+              <div className="mt-1">
+                <CountrySelector
+                  value={selectedCountry?.name || ''}
+                  onSelect={setSelectedCountry}
+                  placeholder="Select your country"
+                />
+              </div>
             </div>
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">

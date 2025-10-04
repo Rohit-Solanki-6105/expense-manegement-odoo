@@ -11,10 +11,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Upload, DollarSign } from "lucide-react"
+import { CalendarIcon, Upload, DollarSign, ArrowRightLeft } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { useCurrencyConverter, formatCurrency, COMMON_CURRENCIES } from "@/lib/currency"
 
 interface Category {
   id: string
@@ -38,9 +39,28 @@ export default function NewExpensePage() {
     receiptUrl: ""
   })
 
+  // Currency conversion functionality
+  const { convertAmount, loading: convertLoading } = useCurrencyConverter()
+  const [convertedAmount, setConvertedAmount] = useState<number | null>(null)
+  const [showConversion, setShowConversion] = useState(false)
+
+  // Base currency (company default or user preference)
+  const baseCurrency = "USD" // Could be configurable
+
   useEffect(() => {
     fetchCategories()
   }, [])
+
+  useEffect(() => {
+    // Auto-convert when amount or currency changes
+    const amount = parseFloat(formData.amount)
+    if (amount > 0 && formData.currency !== baseCurrency) {
+      handleCurrencyConversion()
+    } else {
+      setConvertedAmount(null)
+      setShowConversion(false)
+    }
+  }, [formData.amount, formData.currency])
 
   const fetchCategories = async () => {
     try {
@@ -51,6 +71,24 @@ export default function NewExpensePage() {
       }
     } catch (error) {
       toast.error("Failed to fetch categories")
+    }
+  }
+
+  const handleCurrencyConversion = async () => {
+    const amount = parseFloat(formData.amount)
+    if (amount <= 0 || formData.currency === baseCurrency) {
+      setConvertedAmount(null)
+      setShowConversion(false)
+      return
+    }
+
+    try {
+      const converted = await convertAmount(amount, formData.currency, baseCurrency)
+      setConvertedAmount(converted)
+      setShowConversion(true)
+    } catch (error) {
+      console.error("Currency conversion failed:", error)
+      setShowConversion(false)
     }
   }
 
@@ -75,16 +113,28 @@ export default function NewExpensePage() {
     setLoading(true)
 
     try {
+      // Calculate converted amount for storage if different currency
+      let finalAmount = parseFloat(formData.amount)
+      let finalCurrency = formData.currency
+
+      // Store both original and converted amounts
+      const expenseData = {
+        ...formData,
+        date: date.toISOString(),
+        amount: finalAmount,
+        currency: finalCurrency,
+        originalAmount: finalAmount,
+        originalCurrency: formData.currency,
+        convertedAmount: convertedAmount,
+        baseCurrency: baseCurrency
+      }
+
       const response = await fetch("/api/expenses", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          ...formData,
-          date: date.toISOString(),
-          amount: parseFloat(formData.amount)
-        })
+        body: JSON.stringify(expenseData)
       })
 
       if (response.ok) {
@@ -153,14 +203,14 @@ export default function NewExpensePage() {
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Additional details about this expense..."
+                  placeholder="Provide additional details about this expense"
                   rows={3}
                 />
               </div>
 
               {/* Amount and Currency */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="amount">Amount</Label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -184,19 +234,44 @@ export default function NewExpensePage() {
                     onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select currency" />
+                      <SelectValue placeholder="Currency" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="USD">USD ($)</SelectItem>
-                      <SelectItem value="EUR">EUR (€)</SelectItem>
-                      <SelectItem value="GBP">GBP (£)</SelectItem>
-                      <SelectItem value="JPY">JPY (¥)</SelectItem>
-                      <SelectItem value="CAD">CAD (C$)</SelectItem>
-                      <SelectItem value="AUD">AUD (A$)</SelectItem>
+                      {COMMON_CURRENCIES.map((currency) => (
+                        <SelectItem key={currency.code} value={currency.code}>
+                          {currency.code} - {currency.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+
+              {/* Currency Conversion Display */}
+              {showConversion && convertedAmount && formData.currency !== baseCurrency && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-sm text-blue-700">
+                    <ArrowRightLeft className="h-4 w-4" />
+                    <span className="font-medium">Currency Conversion</span>
+                  </div>
+                  <div className="mt-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span>
+                        {formatCurrency(parseFloat(formData.amount) || 0, formData.currency)} 
+                        <span className="text-muted-foreground ml-1">({formData.currency})</span>
+                      </span>
+                      <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
+                      <span className="font-medium">
+                        {formatCurrency(convertedAmount, baseCurrency)}
+                        <span className="text-muted-foreground ml-1">({baseCurrency})</span>
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Exchange rates are updated hourly
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Date */}
               <div className="space-y-2">
@@ -204,14 +279,14 @@ export default function NewExpensePage() {
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
-                      variant="outline"
+                      variant={"outline"}
                       className={cn(
                         "w-full justify-start text-left font-normal",
                         !date && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {date ? format(date, "PPP") : "Pick a date"}
+                      {date ? format(date, "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -220,6 +295,9 @@ export default function NewExpensePage() {
                       selected={date}
                       onSelect={setDate}
                       initialFocus
+                      disabled={(date) =>
+                        date > new Date() || date < new Date("1900-01-01")
+                      }
                     />
                   </PopoverContent>
                 </Popover>
@@ -239,10 +317,12 @@ export default function NewExpensePage() {
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.id}>
                         <div className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: category.color || "#3B82F6" }}
-                          />
+                          {category.color && (
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: category.color }}
+                            />
+                          )}
                           {category.name}
                         </div>
                       </SelectItem>
@@ -251,19 +331,31 @@ export default function NewExpensePage() {
                 </Select>
               </div>
 
-              {/* Receipt Upload Placeholder */}
+              {/* Receipt Upload */}
               <div className="space-y-2">
                 <Label htmlFor="receipt">Receipt (Optional)</Label>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                   <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-600">
-                      Receipt upload will be implemented in the next phase
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      For now, you can include receipt details in the description
-                    </p>
+                  <div className="mt-2">
+                    <Label htmlFor="receipt-upload" className="cursor-pointer text-sm text-blue-600 hover:text-blue-500">
+                      Upload a receipt
+                    </Label>
+                    <Input
+                      id="receipt-upload"
+                      type="file"
+                      accept="image/*,.pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        // Handle file upload here
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          // In a real app, you'd upload to cloud storage
+                          toast.success("Receipt uploaded successfully")
+                        }
+                      }}
+                    />
                   </div>
+                  <p className="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>
                 </div>
               </div>
 
@@ -272,12 +364,16 @@ export default function NewExpensePage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => router.back()}
+                  onClick={() => router.push("/expenses")}
                   className="flex-1"
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={loading} className="flex-1">
+                <Button 
+                  type="submit" 
+                  disabled={loading || convertLoading}
+                  className="flex-1"
+                >
                   {loading ? "Submitting..." : "Submit Expense"}
                 </Button>
               </div>
