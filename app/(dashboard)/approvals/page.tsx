@@ -19,6 +19,7 @@ interface Approval {
     status: string
     comments: string | null
     createdAt: string
+    isSequenceApproval?: boolean // Flag to distinguish between old and new systems
     expense: {
         id: string
         title: string
@@ -35,6 +36,27 @@ interface Approval {
         category: {
             name: string
             color: string | null
+        }
+        approvalSequence?: {
+            id: string
+            name: string
+            description?: string
+            minApprovalPercentage: number
+            isActive: boolean
+            steps: Array<{
+                id: string
+                managerId: string
+                manager: {
+                    id: string
+                    name: string | null
+                    email: string
+                    role: string
+                }
+                order: number
+                status: "PENDING" | "APPROVED" | "REJECTED" | "SKIPPED"
+                approvedAt?: string
+                comments?: string
+            }>
         }
     }
 }
@@ -55,7 +77,9 @@ export default function ApprovalsPage() {
 
     const fetchApprovals = async () => {
         try {
-            const response = await fetch("/api/approvals")
+            // Fetch expenses that need approval from the current user
+            // This includes both old approval system and new approval sequence system
+            const response = await fetch("/api/expenses/pending-approvals")
             if (response.ok) {
                 const data = await response.json()
                 setApprovals(data)

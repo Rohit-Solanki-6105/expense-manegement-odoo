@@ -32,6 +32,25 @@ export async function GET() {
                 name: true,
                 color: true
               }
+            },
+            approvalSequence: {
+              include: {
+                steps: {
+                  include: {
+                    manager: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true
+                      }
+                    }
+                  },
+                  orderBy: {
+                    order: 'asc'
+                  }
+                }
+              }
             }
           }
         }
