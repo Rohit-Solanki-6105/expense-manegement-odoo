@@ -17,6 +17,7 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useCurrencyConverter, formatCurrency, formatCurrencyWithSymbol, getCurrencySymbol, COMMON_CURRENCIES } from "@/lib/currency"
 import { useCurrency } from "@/contexts/currency-context"
+import { callGeminiDataExtraction, extractTextFromResult } from "@/lib/gemini"
 
 interface Category {
   id: string
@@ -64,9 +65,57 @@ export default function NewExpensePage() {
   const { convertAmount, loading: convertLoading } = useCurrencyConverter()
   const [convertedAmount, setConvertedAmount] = useState<number | null>(null)
   const [showConversion, setShowConversion] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [gloading, setGLoading] = useState(false);
+  const [ocrResult, setOcrResult] = useState<any>(null);
+  const [error, setError] = useState<string>("");
 
+  // Read API key from environment variable
+  const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImageFile(e.target.files[0]);
+      setOcrResult(null);
+      setError("");
+    }
+  };
+
+  const handleUploadClick = async () => {
+    if (!imageFile) {
+      setError("Please select an image file first.");
+      return;
+    }
+
+    if (!GEMINI_API_KEY) {
+      setError("API key not configured in environment variables.");
+      return;
+    }
+
+    setGLoading(true);
+    setError("");
+
+    try {
+      // Use the imported function
+      const json = await callGeminiDataExtraction(imageFile, GEMINI_API_KEY);
+      console.log("Gemini API Response:", json);
+      setOcrResult(json);
+    } catch (e: any) {
+      console.error("API Call Error:", e.message || e);
+      setError(e.message || "Unknown error");
+    } finally {
+      setGLoading(false);
+    }
+  };
+
+  // Use the utility function to easily get the extracted text/JSON
+  const extractedText = extractTextFromResult(ocrResult);
+  const extractedJson = extractedText ? JSON.parse(extractedText.replace('```json', '').replace('```', '')) : null;
   // Base currency (company default or user preference)
-  const baseCurrency = "USD" // Could be configurable
+  const baseCurrency = extractedJson ? extractedJson.TotalBill.split(" ")[0] : "USD" // Could be configurable
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, currency: userCurrency, amount: extractedJson ? extractedJson.TotalBill.split(" ")[1] : "", description: extractedJson ? extractedJson.Description : "" }))
+  }, [extractedJson, userCurrency]);
 
   useEffect(() => {
     fetchCategories()
@@ -128,7 +177,7 @@ export default function NewExpensePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!date) {
       toast.error("Please select a date")
       return
@@ -186,9 +235,9 @@ export default function NewExpensePage() {
     }
   }
 
-  const canSubmitExpenses = session?.user?.role === "EMPLOYEE" || 
-                           session?.user?.role === "MANAGER" ||
-                           ((session?.user as any)?.role === "MANAGER" && (session?.user as any)?.canBeEmployee)
+  const canSubmitExpenses = session?.user?.role === "EMPLOYEE" ||
+    session?.user?.role === "MANAGER" ||
+    ((session?.user as any)?.role === "MANAGER" && (session?.user as any)?.canBeEmployee)
 
   if (!canSubmitExpenses) {
     return (
@@ -294,7 +343,7 @@ export default function NewExpensePage() {
                   <div className="mt-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span>
-                        {formatCurrencyWithSymbol(parseFloat(formData.amount) || 0, formData.currency)} 
+                        {formatCurrencyWithSymbol(parseFloat(formData.amount) || 0, formData.currency)}
                         <span className="text-muted-foreground ml-1">({formData.currency})</span>
                       </span>
                       <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
@@ -355,8 +404,8 @@ export default function NewExpensePage() {
                       <SelectItem key={category.id} value={category.id}>
                         <div className="flex items-center gap-2">
                           {category.color && (
-                            <div 
-                              className="w-3 h-3 rounded-full" 
+                            <div
+                              className="w-3 h-3 rounded-full"
                               style={{ backgroundColor: category.color }}
                             />
                           )}
@@ -419,9 +468,14 @@ export default function NewExpensePage() {
                         if (file) {
                           // In a real app, you'd upload to cloud storage
                           toast.success("Receipt uploaded successfully")
+                          alert("uploading")
+                          // setFormData(prev => ({ ...prev, receiptUrl: URL.createObjectURL(file) }))
+                          handleFileChange(e);
+                          handleUploadClick();
                         }
                       }}
                     />
+                    {gloading && "processing..."}
                   </div>
                   <p className="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>
                 </div>
@@ -437,8 +491,8 @@ export default function NewExpensePage() {
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={loading || convertLoading}
                   className="flex-1"
                 >
