@@ -1,0 +1,139 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+// NextAuth.js models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String?   // For credentials authentication
+  emailVerified DateTime?
+  country       String?   // User's selected country
+  countryCode   String?   // ISO country code
+  currency      String?   // Country's primary currency
+  role          UserRole  @default(ADMIN)
+  canBeEmployee Boolean   @default(false) // Whether user can also act as employee
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+  
+  // Expense Management
+  expenses      Expense[]
+  approvals     Approval[]
+  categories    Category[]
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  color       String?
+  isActive    Boolean   @default(true)
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  creator     User      @relation(fields: [createdBy], references: [id])
+  expenses    Expense[]
+}
+
+model Expense {
+  id              String        @id @default(cuid())
+  title           String
+  description     String?
+  amount          Float
+  currency        String        @default("USD")
+  date            DateTime
+  receiptUrl      String?
+  status          ExpenseStatus @default(PENDING)
+  rejectionReason String?
+  submittedBy     String
+  categoryId      String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  submitter   User        @relation(fields: [submittedBy], references: [id])
+  category    Category    @relation(fields: [categoryId], references: [id])
+  approvals   Approval[]
+}
+
+model Approval {
+  id        String         @id @default(cuid())
+  expenseId String
+  approverId String
+  status    ApprovalStatus @default(PENDING)
+  comments  String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  expense   Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  approver  User    @relation(fields: [approverId], references: [id])
+
+  @@unique([expenseId, approverId])
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PROCESSING
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
