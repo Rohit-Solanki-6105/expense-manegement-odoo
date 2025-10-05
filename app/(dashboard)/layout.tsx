@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/layout/sidebar"
+import PageTransition from "./PageTransition"
 
 export default function DashboardLayout({
   children,
@@ -6,8 +7,11 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <Sidebar>
-      {children}
-    </Sidebar>
+    <PageTransition>
+
+      <Sidebar>
+        {children}
+      </Sidebar>
+    </PageTransition>
   )
 }
